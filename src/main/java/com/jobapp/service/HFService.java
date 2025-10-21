@@ -9,9 +9,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import jakarta.annotation.PostConstruct;
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class HFService {
+    private static final Logger logger = LoggerFactory.getLogger(HFService.class);
     private final RestTemplate rest = new RestTemplate();
     @Value("${hf.token:}")
     private String hfToken;
@@ -26,9 +29,15 @@ public class HFService {
         jobs.add(Map.of("title","ML Engineer","company","GammaAI","desc","PyTorch, transformers, model deployment"));
 // precompute embeddings
         for (Map<String,String> job : jobs) {
-            double[] emb = embedding(job.get("title") + " - " +
-                    job.get("desc"));
-            jobEmbeddings.add(emb);
+            try {
+                double[] emb = embedding(job.get("title") + " - " +
+                        job.get("desc"));
+                jobEmbeddings.add(emb == null ? new double[0] : emb);
+            } catch (Exception ex) {
+                // log and continue so bean creation doesn't fail
+                logger.warn("Failed to compute embedding for job {}: {}", job.get("title"), ex.toString());
+                jobEmbeddings.add(new double[0]);
+            }
         }
     }
     private HttpHeaders makeHeaders(){
@@ -41,22 +50,27 @@ public class HFService {
     }
     // call HF embedding model
     public double[] embedding(String text){
-        String url = "https://api-inference.huggingface.co/embeddings/sentence-transformers/all-MiniLM-L6-v2";
-        Map<String,Object> body = Map.of("inputs", text);
-        HttpEntity<Map<String,Object>> req = new HttpEntity<>(body,
-                makeHeaders());
-        ResponseEntity<Map> resp = rest.exchange(url, HttpMethod.POST, req,
-                Map.class);
-// response has {"embedding": [ ... ]}
-        Map data = resp.getBody();
-        if (data == null) return new double[0];
-        Object embObj = data.get("embedding");
-        if (!(embObj instanceof List)) return new double[0];
-        List<Number> embList = (List<Number>) embObj;
-        double[] arr = new double[embList.size()];
-        for (int i=0;i<embList.size();i++) arr[i] =
-                embList.get(i).doubleValue();
-        return arr;
+        try {
+            String url = "https://api-inference.huggingface.co/embeddings/sentence-transformers/all-MiniLM-L6-v2";
+            Map<String,Object> body = Map.of("inputs", text);
+            HttpEntity<Map<String,Object>> req = new HttpEntity<>(body,
+                    makeHeaders());
+            ResponseEntity<Map> resp = rest.exchange(url, HttpMethod.POST, req,
+                    Map.class);
+    // response has {"embedding": [ ... ]}
+            Map data = resp.getBody();
+            if (data == null) return new double[0];
+            Object embObj = data.get("embedding");
+            if (!(embObj instanceof List)) return new double[0];
+            List<Number> embList = (List<Number>) embObj;
+            double[] arr = new double[embList.size()];
+            for (int i=0;i<embList.size();i++) arr[i] =
+                    embList.get(i).doubleValue();
+            return arr;
+        } catch (Exception e) {
+            logger.warn("Error fetching embedding from HF API: {}", e.toString());
+            return new double[0];
+        }
     }
     private double cosine(double[] a, double[] b){
         RealVector va = new ArrayRealVector(a);

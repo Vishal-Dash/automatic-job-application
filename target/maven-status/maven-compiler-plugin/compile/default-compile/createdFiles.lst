@@ -3,3 +3,4 @@ com/jobapp/dto/SearchResult.class
 com/jobapp/JobSearchApplication.class
 com/jobapp/dto/SearchRequest.class
 com/jobapp/service/HFService.class
+com/jobapp/service/EmbeddingService.class
