@@ -1,5 +1,5 @@
-/Users/vishaldash/IdeaProjects/automatic-job-application/src/main/java/com/jobapp/service/SearchRequest.java
-/Users/vishaldash/IdeaProjects/automatic-job-application/src/main/java/com/jobapp/service/SearchResult.java
-/Users/vishaldash/IdeaProjects/automatic-job-application/src/main/java/com/jobapp/JobSearchApplication.java
-/Users/vishaldash/IdeaProjects/automatic-job-application/src/main/java/com/jobapp/controller/SearchController.java
-/Users/vishaldash/IdeaProjects/automatic-job-application/src/main/java/com/jobapp/dto/HFService.java
+/Users/vishaldash/GitProjects/automatic-job-application/src/main/java/com/jobapp/dto/SearchRequest.java
+/Users/vishaldash/GitProjects/automatic-job-application/src/main/java/com/jobapp/JobSearchApplication.java
+/Users/vishaldash/GitProjects/automatic-job-application/src/main/java/com/jobapp/service/HFService.java
+/Users/vishaldash/GitProjects/automatic-job-application/src/main/java/com/jobapp/dto/SearchResult.java
+/Users/vishaldash/GitProjects/automatic-job-application/src/main/java/com/jobapp/controller/SearchController.java
