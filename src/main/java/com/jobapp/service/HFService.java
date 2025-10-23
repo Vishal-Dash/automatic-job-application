@@ -79,22 +79,22 @@ public class HFService {
         if (denom == 0) return 0;
         return va.dotProduct(vb)/denom;
     }
-    public List<SearchResult> semanticSearch(String query, int k){
+    public List<SearchResult> semanticSearch(String query, int k) {
         double[] qEmb = embedding(query);
-        PriorityQueue<SearchResult> pq = new
-                PriorityQueue<>(Comparator.comparingDouble(r->r.score));
-        for (int i=0;i<jobs.size();i++){
+        List<SearchResult> results = new ArrayList<>();
+        for (int i = 0; i < jobs.size(); i++) {
             double score = cosine(qEmb, jobEmbeddings.get(i));
-            Map<String,String> j = jobs.get(i);
-            SearchResult r = new SearchResult(j.get("title"),
-                    j.get("company"), j.get("desc"), score);
-            pq.add(r);
-            if (pq.size()>k) pq.poll();
+            Map<String, String> j = jobs.get(i);
+            SearchResult r = new SearchResult(j.get("title"), j.get("company"), j.get("desc"), score);
+            results.add(r);
         }
-        List<SearchResult> out = new ArrayList<>();
-        while(!pq.isEmpty()) out.add(pq.poll());
-        Collections.reverse(out);
-        return out;
+        // sort descending by score
+        results.sort(Comparator.comparingDouble(r -> -r.score));
+        // if k > 0, return up to k results; otherwise return all
+        if (k > 0 && results.size() > k) {
+            return new ArrayList<>(results.subList(0, k));
+        }
+        return results;
     }
     // optional: simple generation using flan-t5-small
     public String generateSummary(String prompt){

@@ -1,85 +1,50 @@
 package com.jobapp.service;
 
-import com.jobapp.dto.SearchResult;
-import jakarta.annotation.PostConstruct;
-import org.apache.commons.math3.linear.ArrayRealVector;
-import org.apache.commons.math3.linear.RealVector;
-import org.springframework.http.*;
-import org.springframework.web.client.RestTemplate;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.io.IOException;
 
 @Service
 public class EmbeddingService {
 
+    private static final String EMBEDDING_API_URL = "http://localhost:8000/embed";
+    private final ObjectMapper mapper = new ObjectMapper();
 
-    private final RestTemplate rest = new RestTemplate();
-    private final String EMBED_URL = "http://localhost:8000/embed";
+    public double[] getEmbedding(String text) {
+        try (CloseableHttpClient client = HttpClients.createDefault()) {
+            HttpPost post = new HttpPost(EMBEDDING_API_URL);
+            post.setHeader("Content-Type", "application/json");
+            post.setEntity(new StringEntity("{\"text\": \"" + text.replace("\"", "") + "\"}"));
 
+            var response = client.execute(post);
+            JsonNode json = mapper.readTree(response.getEntity().getContent());
+            JsonNode arr = json.get("embedding");
 
-    private final List<Map<String,String>> jobs = new ArrayList<>();
-    private final List<double[]> jobEmbeddings = new ArrayList<>();
-
-
-    @PostConstruct
-    public void init() {
-        jobs.add(Map.of("title","Senior Java Developer","company","Acme","desc","Work on microservices, Spring Boot, cloud"));
-        jobs.add(Map.of("title","Frontend Engineer","company","Beta Labs","desc","React, Typescript, UX, animations"));
-        jobs.add(Map.of("title","ML Engineer","company","GammaAI","desc","PyTorch, transformers, model deployment"));
-
-
-        for (Map<String,String> job : jobs) {
-            double[] emb = embedding(job.get("title") + " - " + job.get("desc"));
-            jobEmbeddings.add(emb);
-        }
-    }
-
-
-    public double[] embedding(String text) {
-        Map<String, Object> payload = Map.of("inputs", List.of(text));
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<Map<String,Object>> req = new HttpEntity<>(payload, headers);
-        try {
-            ResponseEntity<Map> resp = rest.exchange(EMBED_URL, HttpMethod.POST, req, Map.class);
-
-            Map body = resp.getBody();
-            if (body == null) return new double[0];
-            List<List<Number>> embList = (List<List<Number>>) body.get("embeddings");
-            if (embList == null || embList.isEmpty()) return new double[0];
-            List<Number> e = embList.get(0);
-            double[] arr = new double[e.size()];
-            for (int i = 0; i < e.size(); i++) arr[i] = e.get(i).doubleValue();
-            return arr;
-        } catch (Exception ex) {
-            // if the embedding backend is down or returns unexpected data, don't fail the app startup
+            double[] embedding = new double[arr.size()];
+            for (int i = 0; i < arr.size(); i++) {
+                embedding[i] = arr.get(i).asDouble();
+            }
+            return embedding;
+        } catch (IOException e) {
+            e.printStackTrace();
             return new double[0];
         }
     }
 
-
-    private double cosine(double[] a, double[] b) {
-        RealVector va = new ArrayRealVector(a);
-        RealVector vb = new ArrayRealVector(b);
-        double denom = va.getNorm() * vb.getNorm();
-        return denom == 0 ? 0 : va.dotProduct(vb) / denom;
-    }
-
-
-    public List<SearchResult> semanticSearch(String query, int k) {
-        double[] qEmb = embedding(query);
-        PriorityQueue<SearchResult> pq = new PriorityQueue<>(Comparator.comparingDouble(r -> r.score));
-        for (int i = 0; i < jobs.size(); i++) {
-            double score = cosine(qEmb, jobEmbeddings.get(i));
-            Map<String, String> j = jobs.get(i);
-            SearchResult r = new SearchResult(j.get("title"), j.get("company"), j.get("desc"), score);
-            pq.add(r);
-            if (pq.size() > k) pq.poll();
+    public double cosineSimilarity(double[] a, double[] b) {
+        if (a.length != b.length) return 0.0;
+        double dot = 0.0, normA = 0.0, normB = 0.0;
+        for (int i = 0; i < a.length; i++) {
+            dot += a[i] * b[i];
+            normA += a[i] * a[i];
+            normB += b[i] * b[i];
         }
-        List<SearchResult> out = new ArrayList<>();
-        while (!pq.isEmpty()) out.add(pq.poll());
-        Collections.reverse(out);
-        return out;
+        return dot / (Math.sqrt(normA) * Math.sqrt(normB));
     }
 }
